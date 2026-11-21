@@ -1,0 +1,7 @@
+name = "karkain-messaging"
+version = "0.1.0-dev"
+description = "Named message queues and delivery primitives for Karkain"
+license = "MIT"
+targets = ["native"]
+
+[dependencies]

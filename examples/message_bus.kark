@@ -1,0 +1,15 @@
+// Karkain-Messaging runnable example: publish and acknowledge messages.
+import messaging
+
+func main() {
+    let b = new_bus()
+    b = publish(b, "events", "created")
+    b = publish(b, "events", "updated")
+    b = publish(b, "audit", "logged")
+
+    println(bus_summary(b))
+    println("oldest=" + peek(b, "events"))
+    b = ack(b, "events")
+    println(bus_summary(b))
+    println("queues=" + str(len(queues(b))))
+}

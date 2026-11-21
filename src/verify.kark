@@ -1,0 +1,15 @@
+// Integration verification for the Karkain-Messaging public API.
+import messaging
+
+func main() {
+    let b = new_bus()
+    b = publish(b, "orders", "o1")
+    b = publish(b, "orders", "o2")
+    b = publish(b, "audit", "a1")
+
+    assert_eq(message_count(b), 3)
+    assert_eq(peek(b, "orders"), "o1")
+    b = ack(b, "orders")
+    assert_eq(peek(b, "orders"), "o2")
+    println(bus_summary(b))
+}

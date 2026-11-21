@@ -1,0 +1,61 @@
+// Native tests for Karkain-Messaging.
+
+func sample_bus() {
+    let b = publish(new_bus(), "orders", "order-1")
+    b = publish(b, "orders", "order-2")
+    return publish(b, "audit", "event-1")
+}
+
+func test_new_bus() {
+    assert_eq(message_count(new_bus()), 0)
+    assert_eq(len(queues(new_bus())), 0)
+}
+
+func test_publish() {
+    let b = sample_bus()
+    assert_eq(message_count(b), 3)
+    assert_eq(queue_length(b, "orders"), 2)
+    assert_eq(queue_length(b, "audit"), 1)
+}
+
+func test_peek() {
+    let b = sample_bus()
+    assert_eq(peek(b, "orders"), "order-1")
+    assert_eq(peek(b, "audit"), "event-1")
+    assert_eq(peek(b, "none"), "")
+}
+
+func test_ack() {
+    let b = ack(sample_bus(), "orders")
+    assert_eq(queue_length(b, "orders"), 1)
+    assert_eq(peek(b, "orders"), "order-2")
+    assert_eq(message_count(b), 2)
+}
+
+func test_ack_empty_queue() {
+    let b = ack(sample_bus(), "none")
+    assert_eq(message_count(b), 3)
+}
+
+func test_clear_queue() {
+    let b = clear_queue(sample_bus(), "orders")
+    assert_eq(queue_length(b, "orders"), 0)
+    assert_eq(queue_length(b, "audit"), 1)
+}
+
+func test_queues() {
+    let q = queues(sample_bus())
+    assert_eq(len(q), 2)
+    assert_eq(q[0], "orders")
+    assert_eq(q[1], "audit")
+}
+
+func test_queue_preserves_other_queues() {
+    let b = clear_queue(sample_bus(), "orders")
+    assert_eq(peek(b, "audit"), "event-1")
+}
+
+func test_bus_summary() {
+    assert_eq(bus_summary(sample_bus()), "3 message(s) across 2 queue(s)")
+    assert_eq(bus_summary(new_bus()), "0 message(s) across 0 queue(s)")
+}

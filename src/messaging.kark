@@ -1,0 +1,123 @@
+// Karkain-Messaging - message transport and delivery primitives.
+// Karkain Language v1.2.0 verified baseline (tag v1.2.0,
+// commit 77d70693e1e3134dac312a303bffafa7d50fa988).
+//
+// Scope boundary: this framework models named queues with pending
+// messages in portable Karkain. It does not connect to brokers or open
+// sockets; hosts can bridge encoded messages to their own transport.
+//
+// Bus representation: triples [queue, message, state, ...] with state
+// "pending". Arrays are values; mutating functions return the updated bus.
+
+// new_bus returns an empty message bus.
+public func new_bus() {
+    return []
+}
+
+// publish appends a message to a named queue.
+public func publish(bus, queue, message) {
+    let out = bus
+    out = push(out, queue)
+    out = push(out, message)
+    out = push(out, "pending")
+    return out
+}
+
+// message_count returns the total number of queued messages.
+public func message_count(bus) {
+    return len(bus) / 3
+}
+
+// queue_length counts pending messages in a named queue.
+public func queue_length(bus, queue) {
+    let n = 0
+    let i = 0
+    while (i < len(bus)) {
+        if bus[i] == queue {
+            n = n + 1
+        }
+        i = i + 3
+    }
+    return n
+}
+
+// peek returns the oldest message in a queue, or "".
+public func peek(bus, queue) {
+    let i = 0
+    while (i < len(bus)) {
+        if bus[i] == queue {
+            return bus[i + 1]
+        }
+        i = i + 3
+    }
+    return ""
+}
+
+// ack removes the oldest message from a queue and returns the bus.
+public func ack(bus, queue) {
+    let out = []
+    let removed = false
+    let i = 0
+    while (i < len(bus)) {
+        if bus[i] == queue {
+            if removed == false {
+                removed = true
+                i = i + 3
+            } else {
+                out = push(out, bus[i])
+                out = push(out, bus[i + 1])
+                out = push(out, bus[i + 2])
+                i = i + 3
+            }
+        } else {
+            out = push(out, bus[i])
+            out = push(out, bus[i + 1])
+            out = push(out, bus[i + 2])
+            i = i + 3
+        }
+    }
+    return out
+}
+
+// clear_queue removes every message from a named queue.
+public func clear_queue(bus, queue) {
+    let out = []
+    let i = 0
+    while (i < len(bus)) {
+        if bus[i] == queue {
+            i = i + 3
+        } else {
+            out = push(out, bus[i])
+            out = push(out, bus[i + 1])
+            out = push(out, bus[i + 2])
+            i = i + 3
+        }
+    }
+    return out
+}
+
+// queues returns the distinct queue names.
+public func queues(bus) {
+    let out = []
+    let i = 0
+    while (i < len(bus)) {
+        let found = false
+        let j = 0
+        while (j < len(out)) {
+            if out[j] == bus[i] {
+                found = true
+            }
+            j = j + 1
+        }
+        if found == false {
+            out = push(out, bus[i])
+        }
+        i = i + 3
+    }
+    return out
+}
+
+// bus_summary builds a one-line bus diagnostic.
+public func bus_summary(bus) {
+    return str(message_count(bus)) + " message(s) across " + str(len(queues(bus))) + " queue(s)"
+}
