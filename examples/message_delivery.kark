@@ -1,0 +1,23 @@
+// Karkain-Messaging Phase 2 example: in-process multi-consumer delivery.
+import messaging
+
+func main() {
+    let topics = register_topic(new_topics(), "orders")
+    let consumers = register_consumer(register_consumer(new_consumers(), "orders", "billing"), "orders", "audit")
+    let msg = new_message(1, "event", "order-created")
+    let envelope = new_envelope(msg, "corr-1", "v1")
+
+    let log = dispatch_message(consumers, [], "orders", message_payload(envelope_message(envelope)))
+    println("topic=" + str(topic_registered(topics, "orders")))
+    println("deliveries=" + str(len(log)))
+    println("first=" + log[0])
+
+    let ack = mark_acked(new_ack_state(), 1)
+    println("acked=" + str(is_acked(ack, 1)))
+
+    let letters = dead_letter(new_dead_letters(), 2, "retry-exhausted")
+    println("dead=" + str(dead_letter_count(letters)))
+
+    let broker = new_broker("test-broker", "publish,ack")
+    println("durable=" + str(broker_supports(broker, "durable")))
+}

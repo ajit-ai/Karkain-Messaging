@@ -59,3 +59,87 @@ func test_bus_summary() {
     assert_eq(bus_summary(sample_bus()), "3 message(s) across 2 queue(s)")
     assert_eq(bus_summary(new_bus()), "0 message(s) across 0 queue(s)")
 }
+
+// --- Phase 2 regression ---
+
+func test_phase1_regression() {
+    let b = publish(new_bus(), "orders", "o1")
+    assert_eq(message_count(b), 1)
+    assert_eq(peek(b, "orders"), "o1")
+    assert_eq(message_count(ack(b, "orders")), 0)
+}
+
+// --- Phase 2 additions ---
+
+func test_message_model() {
+    let m = new_message(1, "event", "payload")
+    assert_eq(message_id(m), 1)
+    assert_eq(message_kind(m), "event")
+    assert_eq(message_payload(m), "payload")
+    assert(validate_message(m))
+    assert(validate_message(new_message(0, "event", "x")) == false)
+    assert(validate_message(new_message(1, "", "x")) == false)
+    assert(validate_message(new_message(1, "event", "")) == false)
+}
+
+func test_envelopes() {
+    let m = new_message(1, "event", "p")
+    let e = new_envelope(m, "corr-1", "v2")
+    assert_eq(envelope_correlation(e), "corr-1")
+    assert_eq(envelope_version(e), "v2")
+    assert_eq(message_id(envelope_message(e)), 1)
+}
+
+func test_topics() {
+    let t = register_topic(register_topic(new_topics(), "orders"), "audit")
+    assert(topic_registered(t, "orders"))
+    assert(topic_registered(t, "none") == false)
+    assert_eq(topic_count(t), 2)
+    assert_eq(topic_count(register_topic(t, "orders")), 2)
+}
+
+func test_multi_consumer_delivery() {
+    let c = register_consumer(register_consumer(new_consumers(), "orders", "billing"), "orders", "audit")
+    let names = consumers_for(c, "orders")
+    assert_eq(len(names), 2)
+    assert_eq(names[0], "billing")
+    let log = dispatch_message(c, [], "orders", "created")
+    assert_eq(len(log), 2)
+    assert_eq(log[0], "orders>billing>created")
+    assert_eq(len(dispatch_message(new_consumers(), [], "orders", "x")), 0)
+}
+
+func test_acknowledgements() {
+    let s = mark_acked(mark_acked(new_ack_state(), 1), 3)
+    assert(is_acked(s, 1))
+    assert(is_acked(s, 3))
+    assert(is_acked(s, 2) == false)
+    assert_eq(len(mark_acked(s, 1)), 2)
+}
+
+func test_retry_and_dead_letter() {
+    let p = new_retry_policy(3)
+    assert(message_should_retry(p, 2))
+    assert(message_should_retry(p, 3) == false)
+    let d = dead_letter(dead_letter(new_dead_letters(), 1, "timeout"), 2, "invalid")
+    assert_eq(dead_letter_count(d), 2)
+    assert_eq(d[1], "timeout")
+}
+
+func test_filtering_and_ordering() {
+    assert(message_matches("hello world", "world"))
+    assert(message_matches("hello", ""))
+    assert(message_matches("hello", "xyz") == false)
+    let o = new_ordering("FIFO")
+    assert_eq(ordering_mode(o), "FIFO")
+}
+
+func test_broker_interface() {
+    let b = new_broker("test-broker", "publish,ack")
+    assert(broker_supports(b, "publish"))
+    assert(broker_supports(b, "durable") == false)
+    assert_eq(broker_contract(), "publish>acknowledge>retry>dead-letter")
+    assert_eq(broker_health(0), "healthy")
+    assert_eq(broker_health(1), "degraded")
+    assert_eq(broker_health(9), "down")
+}

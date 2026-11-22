@@ -121,3 +121,200 @@ public func queues(bus) {
 public func bus_summary(bus) {
     return str(message_count(bus)) + " message(s) across " + str(len(queues(bus))) + " queue(s)"
 }
+
+// ---------------------------------------------------------------------------
+// Phase 2 additions. Phase 1 queue API is unchanged. Delivery below is
+// in-process only; broker-backed, durable and cross-process messaging is
+// BLOCKED by missing transport, file and broker builtins.
+
+// new_message creates a message triple [id, kind, payload].
+public func new_message(id, kind, payload) {
+    let m = []
+    m = push(m, id)
+    m = push(m, kind)
+    m = push(m, payload)
+    return m
+}
+
+// message_id returns a message id.
+public func message_id(msg) { return msg[0] }
+
+// message_kind returns a message kind.
+public func message_kind(msg) { return msg[1] }
+
+// message_payload returns a message payload.
+public func message_payload(msg) { return msg[2] }
+
+// validate_message checks id, kind and payload presence.
+public func validate_message(msg) {
+    if msg[0] < 1 { return false }
+    if len(msg[1]) == 0 { return false }
+    if len(msg[2]) == 0 { return false }
+    return true
+}
+
+// new_envelope wraps a message with correlation and version metadata.
+public func new_envelope(msg, correlation, version) {
+    let e = []
+    e = push(e, msg)
+    e = push(e, correlation)
+    e = push(e, version)
+    return e
+}
+
+// envelope_message returns the wrapped message.
+public func envelope_message(envelope) { return envelope[0] }
+
+// envelope_correlation returns the correlation id.
+public func envelope_correlation(envelope) { return envelope[1] }
+
+// envelope_version returns the message version.
+public func envelope_version(envelope) { return envelope[2] }
+
+// new_topics creates an empty topic registry.
+public func new_topics() {
+    return []
+}
+
+// register_topic adds a topic name.
+public func register_topic(topics, name) {
+    if topic_registered(topics, name) { return topics }
+    return push(topics, name)
+}
+
+// topic_registered reports whether a topic exists.
+public func topic_registered(topics, name) {
+    let i = 0
+    while (i < len(topics)) {
+        if topics[i] == name { return true }
+        i = i + 1
+    }
+    return false
+}
+
+// topic_count returns the number of topics.
+public func topic_count(topics) { return len(topics) }
+
+// new_consumers creates an empty consumer registry.
+public func new_consumers() {
+    return []
+}
+
+// register_consumer subscribes a consumer to a topic.
+public func register_consumer(consumers, topic, name) {
+    let out = consumers
+    out = push(out, topic)
+    out = push(out, name)
+    return out
+}
+
+// consumers_for returns the names subscribed to a topic.
+public func consumers_for(consumers, topic) {
+    let out = []
+    let i = 0
+    while (i < len(consumers)) {
+        if consumers[i] == topic { out = push(out, consumers[i + 1]) }
+        i = i + 2
+    }
+    return out
+}
+
+// dispatch_message appends one delivery record per consumer.
+public func dispatch_message(consumers, log, topic, payload) {
+    let out = log
+    let names = consumers_for(consumers, topic)
+    let i = 0
+    while (i < len(names)) {
+        out = push(out, topic + ">" + names[i] + ">" + payload)
+        i = i + 1
+    }
+    return out
+}
+
+// new_ack_state creates an acknowledgement store.
+public func new_ack_state() {
+    return []
+}
+
+// mark_acked records an acknowledged message id.
+public func mark_acked(state, id) {
+    if is_acked(state, id) { return state }
+    return push(state, id)
+}
+
+// is_acked reports whether a message id is acknowledged.
+public func is_acked(state, id) {
+    let i = 0
+    while (i < len(state)) {
+        if state[i] == id { return true }
+        i = i + 1
+    }
+    return false
+}
+
+// new_retry_policy creates a bounded retry policy.
+public func new_retry_policy(max_attempts) {
+    let p = []
+    p = push(p, max_attempts)
+    return p
+}
+
+// message_should_retry reports whether another delivery attempt is allowed.
+public func message_should_retry(policy, attempts) {
+    return attempts < policy[0]
+}
+
+// new_dead_letters creates a dead-letter store.
+public func new_dead_letters() {
+    return []
+}
+
+// dead_letter records a failed message and reason.
+public func dead_letter(letters, id, reason) {
+    let out = letters
+    out = push(out, id)
+    out = push(out, reason)
+    return out
+}
+
+// dead_letter_count returns the number of dead-lettered messages.
+public func dead_letter_count(letters) { return len(letters) / 2 }
+
+// message_matches reports whether a payload contains a needle.
+public func message_matches(payload, needle) {
+    if len(needle) == 0 { return true }
+    return contains(payload, needle)
+}
+
+// new_ordering creates an ordering policy.
+public func new_ordering(mode) {
+    let o = []
+    o = push(o, mode)
+    return o
+}
+
+// ordering_mode returns the declared ordering mode.
+public func ordering_mode(ordering) { return ordering[0] }
+
+// new_broker declares a broker interface with capabilities.
+public func new_broker(name, capabilities) {
+    let b = []
+    b = push(b, name)
+    b = push(b, capabilities)
+    return b
+}
+
+// broker_supports reports whether a capability is advertised.
+public func broker_supports(broker, capability) {
+    return contains(broker[1], capability)
+}
+
+// broker_contract documents the required provider operations.
+public func broker_contract() { return "publish>acknowledge>retry>dead-letter" }
+
+// broker_health interprets a broker health code.
+public func broker_health(code) {
+    if code == 0 { return "healthy" }
+    if code == 1 { return "degraded" }
+    return "down"
+}
